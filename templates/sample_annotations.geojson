@@ -1,0 +1,103 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Sample Location Point",
+        "color": "#2196f3",
+        "fillColor": "#64b5f6",
+        "description": "This is a sample location annotation"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [145.81114563959918, -38.18583043875179]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Building Footprint",
+        "color": "#4caf50",
+        "fillColor": "#81c784",
+        "description": "Sample area annotation - building footprint"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [145.81090, -38.1857],
+          [145.81120, -38.1857],
+          [145.81120, -38.1859],
+          [145.81090, -38.1859],
+          [145.81090, -38.1857]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Access Road",
+        "color": "#ff9800",
+        "fillColor": "#ffb74d",
+        "description": "Sample line annotation - access road"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [145.81070, -38.1858],
+          [145.81080, -38.1859],
+          [145.81090, -38.1860],
+          [145.81100, -38.1861]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Parking Lot",
+        "color": "#9c27b0",
+        "fillColor": "#ba68c8",
+        "description": "Sample area annotation - parking lot"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [145.81075, -38.1860],
+          [145.81105, -38.1860],
+          [145.81105, -38.1862],
+          [145.81075, -38.1862],
+          [145.81075, -38.1860]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Fence Line",
+        "color": "#e91e63",
+        "fillColor": "#f48fb1",
+        "description": "Sample line annotation - fence boundary"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [145.81065, -38.1856],
+          [145.81125, -38.1856],
+          [145.81125, -38.1863]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Entry Gate",
+        "color": "#795548",
+        "fillColor": "#a1887f"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [145.81096844675832, -38.18573042056457]
+      }
+    }
+  ]
+}

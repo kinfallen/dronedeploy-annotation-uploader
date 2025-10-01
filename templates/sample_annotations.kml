@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>DroneDeploy Sample Annotations</name>
+    <description>Sample annotations for upload to DroneDeploy</description>
+    
+    <Style id="location-style">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    
+    <Placemark>
+      <name>Sample Location 1</name>
+      <description>First sample location point</description>
+      <styleUrl>#location-style</styleUrl>
+      <Point>
+        <coordinates>145.81114563959918,-38.18583043875179,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Sample Location 2</name>
+      <description>Second sample location point</description>
+      <styleUrl>#location-style</styleUrl>
+      <Point>
+        <coordinates>145.81116941923875,-38.18573135812284,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Sample Location 3</name>
+      <description>Third sample location point</description>
+      <styleUrl>#location-style</styleUrl>
+      <Point>
+        <coordinates>145.81096844675832,-38.18573042056457,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Equipment Building</name>
+      <description>Main equipment storage building</description>
+      <styleUrl>#location-style</styleUrl>
+      <Point>
+        <coordinates>145.81075748525373,-38.18591399203325,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Parking Area</name>
+      <description>Main parking area</description>
+      <styleUrl>#location-style</styleUrl>
+      <Point>
+        <coordinates>145.81086117673192,-38.1858423915182,0</coordinates>
+      </Point>
+    </Placemark>
+
+    <!-- AREA Annotations (Polygons) -->
+    <Style id="area-style">
+      <PolyStyle>
+        <color>7dff9800</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <LineStyle>
+        <color>ffff9800</color>
+        <width>2</width>
+      </LineStyle>
+    </Style>
+
+    <Placemark>
+      <name>Building Footprint</name>
+      <description>Main building area footprint</description>
+      <styleUrl>#area-style</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              145.81090,-38.1857,0
+              145.81120,-38.1857,0
+              145.81120,-38.1859,0
+              145.81090,-38.1859,0
+              145.81090,-38.1857,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+
+    <Placemark>
+      <name>Parking Lot Area</name>
+      <description>Parking lot boundary</description>
+      <styleUrl>#area-style</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              145.81075,-38.1860,0
+              145.81105,-38.1860,0
+              145.81105,-38.1862,0
+              145.81075,-38.1862,0
+              145.81075,-38.1860,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+
+    <!-- LINE Annotations (LineStrings) -->
+    <Style id="line-style">
+      <LineStyle>
+        <color>fff34235</color>
+        <width>3</width>
+      </LineStyle>
+    </Style>
+
+    <Placemark>
+      <name>Access Road</name>
+      <description>Main access road path</description>
+      <styleUrl>#line-style</styleUrl>
+      <LineString>
+        <coordinates>
+          145.81070,-38.1858,0
+          145.81080,-38.1859,0
+          145.81090,-38.1860,0
+          145.81100,-38.1861,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+
+    <Placemark>
+      <name>Fence Line</name>
+      <description>Security fence boundary</description>
+      <styleUrl>#line-style</styleUrl>
+      <LineString>
+        <coordinates>
+          145.81065,-38.1856,0
+          145.81125,-38.1856,0
+          145.81125,-38.1863,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+
+  </Document>
+</kml>
