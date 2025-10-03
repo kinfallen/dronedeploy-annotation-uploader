@@ -74,21 +74,12 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
       });
 
       setUploadProgress(90);
-      
+
       if (response.data.success) {
         setAnnotations(response.data.annotations);
-        setShowUploadArea(false); // Collapse upload area after successful upload
+        setShowUploadArea(false);
         setUploadProgress(100);
-        
-        // Debug: Log what we're receiving from server
-        console.log('FileUpload received from server:', {
-          annotations: response.data.annotations?.slice(0, 3),
-          originalAnnotations: response.data.originalAnnotations?.slice(0, 3),
-          forceStandardColorsFromServer: response.data.forceStandardColors,
-          forceStandardColorsFromToggle: forceStandardColors
-        });
 
-        // Pass both annotations and color standardization setting
         onFileUpload({
           annotations: response.data.annotations,
           forceStandardColors,
@@ -115,7 +106,7 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [forceStandardColors, onFileUpload]);
 
   const { getRootProps, getInputProps, isDragActive, acceptedFiles } = useDropzone({
     onDrop,

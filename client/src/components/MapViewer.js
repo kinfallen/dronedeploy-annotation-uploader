@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { Box, Paper, Typography, Chip } from '@mui/material';
+import { Box, Paper, Typography } from '@mui/material';
 import L from 'leaflet';
 
 // Fix for default markers not showing up in react-leaflet
@@ -210,6 +210,7 @@ const MapViewer = ({ annotations, height = 400 }) => {
         mapRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annotations, centerPosition]);
 
   // Cleanup on unmount

@@ -69,32 +69,19 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
 
   // Extract unique colors and create initial mappings
   useEffect(() => {
-    console.log('Color mapping useEffect triggered:', {
-      annotationsCount: annotations?.length,
-      hasOriginalAnnotations: !!config.originalAnnotations,
-      originalAnnotationsCount: config.originalAnnotations?.length
-    });
-    
     if (Array.isArray(annotations) && config.originalAnnotations && config.originalAnnotations.length > 0) {
       const uniqueColors = {};
-      
+
       annotations.forEach((annotation, index) => {
         const originalColor = config.originalAnnotations[index]?.color;
         const standardizedColor = annotation.color;
-        
+
         if (originalColor && !uniqueColors[originalColor]) {
           uniqueColors[originalColor] = standardizedColor;
         }
       });
-      
-      console.log('Setting color mappings:', uniqueColors);
+
       setColorMappings(uniqueColors);
-    } else {
-      console.log('Color mapping conditions not met:', {
-        annotationsIsArray: Array.isArray(annotations),
-        hasOriginalAnnotations: !!config.originalAnnotations,
-        originalAnnotationsLength: config.originalAnnotations?.length
-      });
     }
   }, [annotations, config.originalAnnotations]);
 
@@ -109,14 +96,6 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
     return color;
   };
 
-  // Debug logging for color comparison
-  useEffect(() => {
-    if (config.originalAnnotations && showOriginalColors) {
-      console.log('Original annotations:', config.originalAnnotations?.slice(0, 3));
-      console.log('Current annotations:', annotations?.slice(0, 3));
-      console.log('Config force standard colors:', config.forceStandardColors);
-    }
-  }, [config.originalAnnotations, showOriginalColors, annotations, config.forceStandardColors]);
 
   const getAnnotationIcon = (type) => {
     switch (type) {
@@ -185,21 +164,13 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
 
     try {
       const totalAnnotations = editingAnnotations.length;
-      
-      console.log(`🚀 UPLOAD STARTED - ${totalAnnotations} annotations total`);
-      console.log('📊 editingAnnotations sample:', editingAnnotations.slice(0, 2));
-      
-      // Create batches with safer size for DroneDeploy API processing time
-      const maxBatchSize = 50; // Very conservative: ~50 annotations * 0.3s = 15s processing time
+      const maxBatchSize = 50;
       const batches = [];
-      
+
       for (let i = 0; i < totalAnnotations; i += maxBatchSize) {
         const batch = editingAnnotations.slice(i, i + maxBatchSize);
         batches.push(batch);
       }
-      
-      console.log(`📦 Created ${batches.length} batches (max ${maxBatchSize} per batch)`);
-      console.log(`🎯 Batch sizes:`, batches.map(b => b.length));
       
       // Set initial batch info
       setBatchInfo({ current: 0, total: batches.length, totalAnnotations });
@@ -209,45 +180,27 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
       
       // Upload each batch
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        // Check for cancellation
         if (cancelRequested) {
-          console.log('🛑 Upload cancelled by user');
           allErrors.push({ error: 'Upload cancelled by user', cancelled: true });
           break;
         }
 
-        console.log(`\n🔄 === STARTING BATCH ${batchIndex + 1} of ${batches.length} ===`);
-        
         const batch = batches[batchIndex];
         const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
-        
-        console.log(`📦 Batch ${batchIndex + 1} contains ${batch.length} annotations`);
-        console.log(`🎯 First annotation in batch:`, batch[0]?.title || 'Unknown');
-        
-        // Estimate payload size (rough calculation)
+
         const estimatedPayloadSize = JSON.stringify({
           annotations: batch,
           planId: config.planId,
-          apiKey: 'xxx' // Don't log real API key
+          apiKey: 'xxx'
         }).length;
-        
-        console.log(`📊 Estimated payload size: ${Math.round(estimatedPayloadSize/1024)}KB`);
-        console.log(`⚡ Starting API request for batch ${batchIndex + 1}/${batches.length} - ${progress}%`);
-        
-        // Update progress info with explicit state logging
+
         const newBatchInfo = { current: batchIndex + 1, total: batches.length, totalAnnotations };
         setBatchInfo(newBatchInfo);
         setUploadProgress(progress);
-        
-        console.log(`🎨 UI State updated: Batch ${newBatchInfo.current}/${newBatchInfo.total}, Progress: ${progress}%`);
-        
-        // Force UI update with small delay
+
         await new Promise(resolve => setTimeout(resolve, 100));
         
         try {
-          console.log(`🌐 Making API request to /api/upload-annotations...`);
-          const startTime = Date.now();
-          
           const requestPayload = {
             annotations: batch,
             planId: config.planId,
@@ -259,47 +212,28 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
               payloadSizeKB: Math.round(estimatedPayloadSize/1024)
             }
           };
-          
-          console.log(`📤 Request payload prepared, sending with 2min timeout...`);
+
           const response = await axios.post('/api/upload-annotations', requestPayload, {
-            timeout: 120000, // 2 minute timeout for DroneDeploy processing
-            onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              console.log(`📡 Upload progress: ${percentCompleted}%`);
-            }
+            timeout: 120000,
+            onUploadProgress: () => {}
           });
-          
-          const endTime = Date.now();
-          console.log(`✅ Batch ${batchIndex + 1} completed in ${endTime - startTime}ms`);
-          console.log(`📥 Response received:`, response.data?.success ? 'SUCCESS' : 'PARTIAL/ERROR');
-          console.log(`🔄 About to process next batch...`);
 
           if (response.data.results) {
             allResults.push(...response.data.results);
-            console.log(`Added ${response.data.results.length} successful results`);
           }
           if (response.data.errors) {
             allErrors.push(...response.data.errors);
-            console.log(`Added ${response.data.errors.length} errors`);
           }
-          
+
         } catch (batchError) {
-          console.error(`\n💥 === BATCH ${batchIndex + 1} FAILED ===`);
-          console.error(`❌ Error type:`, batchError.name);
-          console.error(`❌ Error message:`, batchError.message);
-          console.error(`❌ Response status:`, batchError.response?.status);
-          console.error(`❌ Response data:`, batchError.response?.data);
-          console.error(`❌ Full error object:`, batchError);
-          
+          console.error('Batch error:', batchError.message);
+
           allErrors.push({
             error: `Batch ${batchIndex + 1} failed: ${batchError.message}`,
             batch: batchIndex + 1,
             status: batchError.response?.status,
             details: batchError.response?.data
           });
-          
-          // Continue with next batch even if this one fails
-          console.log(`🔄 Continuing with next batch despite error...`);
         }
         
         // Rate limiting: Add delay between batches to respect API limits
@@ -341,7 +275,6 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
   };
 
   const handleCancelUpload = () => {
-    console.log('🛑 User requested upload cancellation');
     setCancelRequested(true);
     setUploading(false);
     setUploadProgress(0);

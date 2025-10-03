@@ -14,15 +14,13 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Alert,
-  Divider
+  Alert
 } from '@mui/material';
 import {
   ArrowBack,
   ExpandMore,
   LocationOn,
   Crop,
-  Timeline,
   Description,
   Download
 } from '@mui/icons-material';
