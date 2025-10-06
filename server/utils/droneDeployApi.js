@@ -185,48 +185,50 @@ async function createAnnotation(annotation, planId, apiKey) {
 async function createAnnotationsBatch(annotations, planId, apiKey, onProgress = null) {
   const results = [];
   const errors = [];
-  
-  for (let i = 0; i < annotations.length; i++) {
-    const annotation = annotations[i];
-    
-    try {
-      const result = await createAnnotation(annotation, planId, apiKey);
-      
-      if (result.success) {
+  const BATCH_SIZE = 25;
+  let completed = 0;
+
+  for (let batchStart = 0; batchStart < annotations.length; batchStart += BATCH_SIZE) {
+    const batch = annotations.slice(batchStart, batchStart + BATCH_SIZE);
+
+    // Map each annotation in the batch to a promise
+    const promises = batch.map((annotation, idx) =>
+      createAnnotation(annotation, planId, apiKey)
+        .then(result => ({ result, annotation, index: batchStart + idx }))
+        .catch(error => ({ error, annotation, index: batchStart + idx }))
+    );
+
+    // Wait for all in this batch to finish
+    const batchResults = await Promise.all(promises);
+
+    for (const { result, error, annotation, index } of batchResults) {
+      if (result && result.success) {
         results.push(result);
       } else {
         errors.push({
           annotation: annotation.title,
-          error: result.error,
-          index: i + 1
+          error: (result && result.error) || (error && error.message) || 'Unknown error',
+          index: index + 1
         });
       }
-      
-      // Call progress callback if provided
+
+      completed++;
       if (onProgress) {
         onProgress({
-          completed: i + 1,
+          completed,
           total: annotations.length,
           current: annotation.title,
-          success: result.success
+          success: result ? result.success : false
         });
       }
-      
-      // Add delay between requests to respect rate limits
-      if (i < annotations.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, DRONEDEPLOY_CONFIG.BATCH_DELAY));
-      }
-      
-    } catch (error) {
-      console.error(`Error creating annotation ${i + 1}:`, error);
-      errors.push({
-        annotation: annotation.title,
-        error: error.message,
-        index: i + 1
-      });
+    }
+
+    // Add delay between batches to respect rate limits
+    if (batchStart + BATCH_SIZE < annotations.length) {
+      await new Promise(resolve => setTimeout(resolve, DRONEDEPLOY_CONFIG.BATCH_DELAY));
     }
   }
-  
+
   return {
     success: true,
     results,
