@@ -69,12 +69,6 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
 
   // Extract unique colors and create initial mappings
   useEffect(() => {
-    console.log('Color mapping useEffect triggered:', {
-      annotationsCount: annotations?.length,
-      hasOriginalAnnotations: !!config.originalAnnotations,
-      originalAnnotationsCount: config.originalAnnotations?.length
-    });
-    
     if (Array.isArray(annotations) && config.originalAnnotations && config.originalAnnotations.length > 0) {
       const uniqueColors = {};
       
@@ -87,14 +81,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
         }
       });
       
-      console.log('Setting color mappings:', uniqueColors);
       setColorMappings(uniqueColors);
-    } else {
-      console.log('Color mapping conditions not met:', {
-        annotationsIsArray: Array.isArray(annotations),
-        hasOriginalAnnotations: !!config.originalAnnotations,
-        originalAnnotationsLength: config.originalAnnotations?.length
-      });
     }
   }, [annotations, config.originalAnnotations]);
 
@@ -110,13 +97,12 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
   };
 
   // Debug logging for color comparison
+  // Update showOriginalColors when config changes
   useEffect(() => {
-    if (config.originalAnnotations && showOriginalColors) {
-      console.log('Original annotations:', config.originalAnnotations?.slice(0, 3));
-      console.log('Current annotations:', annotations?.slice(0, 3));
-      console.log('Config force standard colors:', config.forceStandardColors);
+    if (config.forceStandardColors !== undefined) {
+      setShowOriginalColors(config.forceStandardColors);
     }
-  }, [config.originalAnnotations, showOriginalColors, annotations, config.forceStandardColors]);
+  }, [config.forceStandardColors]);
 
   const getAnnotationIcon = (type) => {
     switch (type) {
@@ -186,8 +172,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
     try {
       const totalAnnotations = editingAnnotations.length;
       
-      console.log(`🚀 UPLOAD STARTED - ${totalAnnotations} annotations total`);
-      console.log('📊 editingAnnotations sample:', editingAnnotations.slice(0, 2));
+      // Starting upload process
       
       // Create batches with safer size for DroneDeploy API processing time
       const maxBatchSize = 50; // Very conservative: ~50 annotations * 0.3s = 15s processing time
@@ -198,8 +183,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
         batches.push(batch);
       }
       
-      console.log(`📦 Created ${batches.length} batches (max ${maxBatchSize} per batch)`);
-      console.log(`🎯 Batch sizes:`, batches.map(b => b.length));
+      // Created batches for upload
       
       // Set initial batch info
       setBatchInfo({ current: 0, total: batches.length, totalAnnotations });
@@ -211,18 +195,12 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         // Check for cancellation
         if (cancelRequested) {
-          console.log('🛑 Upload cancelled by user');
           allErrors.push({ error: 'Upload cancelled by user', cancelled: true });
           break;
         }
 
-        console.log(`\n🔄 === STARTING BATCH ${batchIndex + 1} of ${batches.length} ===`);
-        
         const batch = batches[batchIndex];
         const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
-        
-        console.log(`📦 Batch ${batchIndex + 1} contains ${batch.length} annotations`);
-        console.log(`🎯 First annotation in batch:`, batch[0]?.title || 'Unknown');
         
         // Estimate payload size (rough calculation)
         const estimatedPayloadSize = JSON.stringify({
@@ -231,22 +209,15 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
           apiKey: 'xxx' // Don't log real API key
         }).length;
         
-        console.log(`📊 Estimated payload size: ${Math.round(estimatedPayloadSize/1024)}KB`);
-        console.log(`⚡ Starting API request for batch ${batchIndex + 1}/${batches.length} - ${progress}%`);
-        
-        // Update progress info with explicit state logging
+        // Update progress info
         const newBatchInfo = { current: batchIndex + 1, total: batches.length, totalAnnotations };
         setBatchInfo(newBatchInfo);
         setUploadProgress(progress);
-        
-        console.log(`🎨 UI State updated: Batch ${newBatchInfo.current}/${newBatchInfo.total}, Progress: ${progress}%`);
         
         // Force UI update with small delay
         await new Promise(resolve => setTimeout(resolve, 100));
         
         try {
-          console.log(`🌐 Making API request to /api/upload-annotations...`);
-          const startTime = Date.now();
           
           const requestPayload = {
             annotations: batch,
@@ -260,27 +231,15 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
             }
           };
           
-          console.log(`📤 Request payload prepared, sending with 2min timeout...`);
           const response = await axios.post('/api/upload-annotations', requestPayload, {
             timeout: 120000, // 2 minute timeout for DroneDeploy processing
-            onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              console.log(`📡 Upload progress: ${percentCompleted}%`);
-            }
           });
           
-          const endTime = Date.now();
-          console.log(`✅ Batch ${batchIndex + 1} completed in ${endTime - startTime}ms`);
-          console.log(`📥 Response received:`, response.data?.success ? 'SUCCESS' : 'PARTIAL/ERROR');
-          console.log(`🔄 About to process next batch...`);
-
           if (response.data.results) {
             allResults.push(...response.data.results);
-            console.log(`Added ${response.data.results.length} successful results`);
           }
           if (response.data.errors) {
             allErrors.push(...response.data.errors);
-            console.log(`Added ${response.data.errors.length} errors`);
           }
           
         } catch (batchError) {
@@ -299,7 +258,6 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
           });
           
           // Continue with next batch even if this one fails
-          console.log(`🔄 Continuing with next batch despite error...`);
         }
         
         // Rate limiting: Add delay between batches to respect API limits
@@ -341,7 +299,6 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
   };
 
   const handleCancelUpload = () => {
-    console.log('🛑 User requested upload cancellation');
     setCancelRequested(true);
     setUploading(false);
     setUploadProgress(0);
@@ -428,15 +385,8 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
     );
   }
 
-  // Debug: Log what we're receiving
-  console.log('AnnotationPreview Debug:', {
-    annotationsLength: annotations?.length,
-    configOriginalAnnotations: !!config.originalAnnotations,
-    configOriginalAnnotationsLength: config.originalAnnotations?.length,
-    configForceStandardColors: config.forceStandardColors,
-    colorMappingsKeys: Object.keys(colorMappings),
-    shouldShowColorMapper: config.originalAnnotations && config.forceStandardColors
-  });
+  // Color mapper configuration
+  const showColorMapper = config.originalAnnotations && config.forceStandardColors;
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -512,8 +462,8 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
 
         {!uploading && <MapViewer annotations={editingAnnotations} height={500} />}
 
-        {/* Color Mapper Section */}
-        {config.originalAnnotations && config.forceStandardColors && (
+      {/* Color Mapper Section */}
+      {showColorMapper && (
           <Paper 
             elevation={2}
             sx={{ 

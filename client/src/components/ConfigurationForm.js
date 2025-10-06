@@ -69,7 +69,7 @@ const ConfigurationForm = ({ config, onSave, onBack, persistentMode = false }) =
     if (persistentMode && (formData.planId || formData.apiKey)) {
       onSave(formData);
     }
-  }, [formData.planId, formData.apiKey, persistentMode]); // Removed onSave to prevent infinite loop
+  }, [formData.planId, formData.apiKey, persistentMode, onSave]);
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -138,7 +138,6 @@ const ConfigurationForm = ({ config, onSave, onBack, persistentMode = false }) =
               &nbsp;&nbsp;&nbsp;• URL: /maps/<strong>6729ae04309c758354e71ce1</strong> → Enter: <strong>6729ae04309c758354e71ce1</strong>
             </Typography>
           </Alert>
-          
 
           <Alert severity="warning" sx={{ mb: 3 }}>
             <Typography variant="body2">

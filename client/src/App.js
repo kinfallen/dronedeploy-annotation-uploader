@@ -435,13 +435,6 @@ function App() {
   };
 
   const handleFileUpload = (uploadData) => {
-    // Debug: Log what App.js is receiving
-    console.log('App.js handleFileUpload received:', {
-      isArray: Array.isArray(uploadData),
-      annotations: uploadData.annotations?.slice(0, 3),
-      originalAnnotations: uploadData.originalAnnotations?.slice(0, 3),
-      forceStandardColors: uploadData.forceStandardColors
-    });
 
     // Handle both old format (just annotations) and new format (object with annotations + metadata)
     if (Array.isArray(uploadData)) {
