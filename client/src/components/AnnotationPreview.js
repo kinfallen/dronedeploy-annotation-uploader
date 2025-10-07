@@ -24,7 +24,8 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Link
 } from '@mui/material';
 import {
   ArrowBack,
@@ -40,10 +41,12 @@ import {
   Visibility,
   VisibilityOff,
   Palette,
-  SwapHoriz
+  SwapHoriz,
+  OpenInNew
 } from '@mui/icons-material';
 import axios from 'axios';
 import MapViewer from './MapViewer';
+import { saveUploadToHistory } from '../utils/uploadHistory';
 
 const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) => {
   const [uploading, setUploading] = useState(false);
@@ -52,38 +55,83 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
   const [cancelRequested, setCancelRequested] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
-  const [editingAnnotations, setEditingAnnotations] = useState(Array.isArray(annotations) ? [...annotations] : []);
+  const [editingAnnotations, setEditingAnnotations] = useState([]);
   const [editingIndex, setEditingIndex] = useState(-1);
   const [tempEdit, setTempEdit] = useState({ title: '', color: '' });
   const [showOriginalColors, setShowOriginalColors] = useState(config.forceStandardColors || false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [colorMappings, setColorMappings] = useState({});
-
-  // Update editing annotations when annotations prop changes
+  const [mapDetails, setMapDetails] = useState(null);
+  const [loadingMapDetails, setLoadingMapDetails] = useState(false);
+  
+  // Simple effect to update editing annotations - only depends on annotations length and first item to avoid infinite loops
   useEffect(() => {
-    if (Array.isArray(annotations)) {
+    if (Array.isArray(annotations) && annotations.length > 0) {
       setEditingAnnotations([...annotations]);
     }
-  }, [annotations]);
+  }, [annotations?.length, annotations?.[0]?.title, annotations?.[0]?.color]); // Only update when meaningful changes occur
+
+  // Helper function to find closest DroneDeploy color
+  const findClosestDroneDeployColor = (hexColor) => {
+    if (!hexColor) return droneDeployColors[0].color; // Default to first color
+    
+    // Convert hex to RGB
+    const hex = hexColor.replace('#', '');
+    const r1 = parseInt(hex.substr(0, 2), 16);
+    const g1 = parseInt(hex.substr(2, 2), 16);
+    const b1 = parseInt(hex.substr(4, 2), 16);
+    
+    let closestColor = droneDeployColors[0].color;
+    let minDistance = Infinity;
+    
+    droneDeployColors.forEach(ddColor => {
+      const ddHex = ddColor.color.replace('#', '');
+      const r2 = parseInt(ddHex.substr(0, 2), 16);
+      const g2 = parseInt(ddHex.substr(2, 2), 16);
+      const b2 = parseInt(ddHex.substr(4, 2), 16);
+      
+      // Calculate Euclidean distance in RGB space
+      const distance = Math.sqrt(
+        Math.pow(r2 - r1, 2) + Math.pow(g2 - g1, 2) + Math.pow(b2 - b1, 2)
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestColor = ddColor.color;
+      }
+    });
+    
+    return closestColor;
+  };
 
   // Extract unique colors and create initial mappings
   useEffect(() => {
-    if (Array.isArray(annotations) && config.originalAnnotations && config.originalAnnotations.length > 0) {
+    if (Array.isArray(annotations) && annotations.length > 0) {
       const uniqueColors = {};
       
-      annotations.forEach((annotation, index) => {
-        const originalColor = config.originalAnnotations[index]?.color;
-        const standardizedColor = annotation.color;
-        
-        if (originalColor && !uniqueColors[originalColor]) {
-          uniqueColors[originalColor] = standardizedColor;
-        }
-      });
+      if (config.originalAnnotations && config.originalAnnotations.length > 0) {
+        // Map original colors to standardized colors
+        annotations.forEach((annotation, index) => {
+          const originalColor = config.originalAnnotations[index]?.color;
+          const standardizedColor = annotation.color;
+          
+          if (originalColor && !uniqueColors[originalColor]) {
+            uniqueColors[originalColor] = findClosestDroneDeployColor(standardizedColor);
+          }
+        });
+      } else {
+        // For direct uploads without original colors, suggest closest DroneDeploy colors
+        annotations.forEach(annotation => {
+          if (annotation.color && !uniqueColors[annotation.color]) {
+            uniqueColors[annotation.color] = findClosestDroneDeployColor(annotation.color);
+          }
+        });
+      }
       
       setColorMappings(uniqueColors);
     }
-  }, [annotations, config.originalAnnotations]);
+  }, [annotations?.length, annotations?.[0]?.color, config.originalAnnotations?.length]); // Only update when meaningful changes occur
 
   // Helper function to ensure color has # prefix for CSS display
   const formatColorForDisplay = (color) => {
@@ -103,6 +151,30 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
       setShowOriginalColors(config.forceStandardColors);
     }
   }, [config.forceStandardColors]);
+
+  // Fetch map details when config changes
+  useEffect(() => {
+    const fetchMapDetails = async () => {
+      if (config.planId && config.apiKey) {
+        setLoadingMapDetails(true);
+        try {
+          const response = await axios.get(`http://localhost:3001/api/dronedeploy/map/${config.planId}?apiKey=${config.apiKey}`);
+          if (response.data.success) {
+            setMapDetails(response.data.data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch map details:', error);
+          setMapDetails(null);
+        } finally {
+          setLoadingMapDetails(false);
+        }
+      } else {
+        setMapDetails(null);
+      }
+    };
+
+    fetchMapDetails();
+  }, [config.planId, config.apiKey]);
 
   const getAnnotationIcon = (type) => {
     switch (type) {
@@ -130,13 +202,44 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
     }
   };
 
-  const formatGeometry = (geometry) => {
+  const formatGeometry = (annotation) => {
+    // Handle LOCATION annotations with lat/lng directly on annotation
+    if ((annotation.type === 'LOCATION' || annotation.annotationType === 'LOCATION') && annotation.lat && annotation.lng) {
+      return `${annotation.lat.toFixed(6)}, ${annotation.lng.toFixed(6)}`;
+    }
+    
+    const geometry = annotation.geometry;
+    if (!geometry) {
+      return 'No geometry';
+    }
+    
+    // Handle lat/lng format (legacy)
     if (geometry.lat && geometry.lng) {
       return `${geometry.lat.toFixed(6)}, ${geometry.lng.toFixed(6)}`;
     }
+    
+    // Handle GeoJSON Point format
+    if (geometry.type === 'Point' && geometry.coordinates) {
+      const [lng, lat] = geometry.coordinates;
+      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+    
+    // Handle GeoJSON Polygon format
+    if (geometry.type === 'Polygon' && geometry.coordinates) {
+      const coords = geometry.coordinates[0]; // Outer ring
+      return `Polygon (${coords.length} points)`;
+    }
+    
+    // Handle GeoJSON LineString format
+    if (geometry.type === 'LineString' && geometry.coordinates) {
+      return `Line (${geometry.coordinates.length} points)`;
+    }
+    
+    // Handle array format (server-converted format for AREA/LINE)
     if (Array.isArray(geometry)) {
       return `${geometry.length} coordinates`;
     }
+    
     return 'Complex geometry';
   };
 
@@ -166,6 +269,12 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
   };
 
   const handleUpload = async () => {
+    // Validate configuration first
+    if (!config.apiKey || !config.planId) {
+      alert('Please configure your DroneDeploy API Key and Map ID in the configuration section above before uploading.');
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
 
@@ -231,7 +340,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
             }
           };
           
-          const response = await axios.post('/api/upload-annotations', requestPayload, {
+          const response = await axios.post('http://localhost:3001/api/dronedeploy/upload', requestPayload, {
             timeout: 120000, // 2 minute timeout for DroneDeploy processing
           });
           
@@ -282,6 +391,45 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
         projectId: allResults[0]?.projectId,
         mapId: config.planId
       };
+
+      // Save successful upload to history if there were successful annotations
+      if (allResults.length > 0 && mapDetails) {
+        const annotationTypes = {};
+        
+        // Count annotation types from successful uploads
+        allResults.forEach(result => {
+          const type = result.annotationType || 'unknown';
+          annotationTypes[type] = (annotationTypes[type] || 0) + 1;
+        });
+
+        const uploadHistoryData = {
+          mapId: config.planId,
+          mapName: mapDetails.name,
+          mapDate: (() => {
+            try {
+              const date = new Date(mapDetails.dateImagesCaptured);
+              if (isNaN(date.getTime())) {
+                return mapDetails.dateImagesCaptured;
+              }
+              return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              });
+            } catch (error) {
+              return mapDetails.dateImagesCaptured;
+            }
+          })(),
+          totalAnnotations: allResults.length,
+          annotationTypes: annotationTypes,
+          successfulAnnotationIds: allResults.map(result => result.id).filter(id => id),
+          projectId: mapDetails.projectId
+        };
+
+        saveUploadToHistory(uploadHistoryData);
+        console.log('Saved upload to history:', uploadHistoryData);
+      }
 
       setTimeout(() => {
         onUpload(combinedResults);
@@ -403,7 +551,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
       }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            {editingAnnotations.length} annotations ready to upload
+            {editingAnnotations.length} annotation{editingAnnotations.length === 1 ? '' : 's'} ready to upload
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {stats.LOCATION > 0 && (
@@ -452,10 +600,63 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
               Target Destination
             </Typography>
             <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
-              <strong>Map ID:</strong> {config.planId}
+              <strong>Map ID:</strong> {config.planId || 'Not configured'}
             </Typography>
+            {mapDetails && (
+              <Box>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary', mt: 0.5 }}>
+                  <strong>Name:</strong> {mapDetails.name} ({(() => {
+                    try {
+                      const date = new Date(mapDetails.dateImagesCaptured);
+                      if (isNaN(date.getTime())) {
+                        return mapDetails.dateImagesCaptured; // Fallback to raw value
+                      }
+                      return date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                      });
+                    } catch (error) {
+                      return mapDetails.dateImagesCaptured; // Fallback to raw value
+                    }
+                  })()})
+                </Typography>
+                {mapDetails.projectId && (
+                  <Link
+                    href={`https://www.dronedeploy.com/app2/sites/${mapDetails.projectId.replace('Project:', '')}/maps/${config.planId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: 0.5,
+                      fontSize: '0.875rem',
+                      color: 'primary.main',
+                      textDecoration: 'none',
+                      mt: 0.5,
+                      '&:hover': {
+                        textDecoration: 'underline'
+                      }
+                    }}
+                  >
+                    View in DroneDeploy <OpenInNew fontSize="small" />
+                  </Link>
+                )}
+              </Box>
+            )}
+            {loadingMapDetails && (
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, fontStyle: 'italic' }}>
+                Loading map details...
+              </Typography>
+            )}
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              All annotations will be uploaded to your DroneDeploy map with the specified ID.
+              {config.planId && config.apiKey 
+                ? mapDetails 
+                  ? `All annotation${editingAnnotations.length === 1 ? '' : 's'} will be uploaded to "${mapDetails.name}".`
+                  : `All annotation${editingAnnotations.length === 1 ? '' : 's'} will be uploaded to your DroneDeploy map with the specified ID.`
+                : 'Please configure your API Key and Map ID in the configuration section above to enable uploading.'
+              }
             </Typography>
           </Box>
         </Alert>
@@ -501,23 +702,26 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
                 />
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Customize how your original colors map to DroneDeploy colors. Changes apply to all annotations with that color.
+                Customize how your original colors map to DroneDeploy colors. Changes apply to all annotation${editingAnnotations.length === 1 ? '' : 's'} with that color.
               </Typography>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 300 }}>
-              <Table size="small">
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Original Color</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <SwapHoriz fontSize="small" />
-                        Maps To
-                      </Box>
+                    <TableCell sx={{ backgroundColor: 'background.paper', fontWeight: 600, width: '30%' }}>
+                      Original Color
                     </TableCell>
-                    <TableCell>DroneDeploy Color</TableCell>
-                    <TableCell>Annotations Using This Color</TableCell>
+                    <TableCell sx={{ backgroundColor: 'background.paper', width: '10%', textAlign: 'center' }}>
+                      <SwapHoriz fontSize="small" />
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: 'background.paper', fontWeight: 600, width: '35%' }}>
+                      DroneDeploy Color
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: 'background.paper', fontWeight: 600, width: '25%' }}>
+                      Annotations Using This Color
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -591,7 +795,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
                         </TableCell>
                         <TableCell>
                           <Chip 
-                            label={`${annotationCount} annotations`}
+                            label={`${annotationCount} annotation${annotationCount === 1 ? '' : 's'}`}
                             size="small"
                             color="primary"
                             variant="outlined"
@@ -652,7 +856,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
               </Box>
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
-              Review and edit your annotations before uploading to DroneDeploy
+              Review and edit your annotation${editingAnnotations.length === 1 ? '' : 's'} before uploading to DroneDeploy
             </Typography>
           </Box>
           <TableContainer sx={{ maxHeight: 450 }}>
@@ -723,10 +927,10 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
                   <TableRow key={index}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getAnnotationIcon(annotation.annotationType)}
+                        {getAnnotationIcon(annotation.type || annotation.annotationType)}
                         <Chip
-                          label={annotation.annotationType}
-                          color={getAnnotationTypeColor(annotation.annotationType)}
+                          label={annotation.type || annotation.annotationType}
+                          color={getAnnotationTypeColor(annotation.type || annotation.annotationType)}
                           size="small"
                           variant="outlined"
                         />
@@ -817,7 +1021,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
                     )}
                     <TableCell>
                       <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                        {formatGeometry(annotation.geometry)}
+                        {formatGeometry(annotation)}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -885,7 +1089,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
           <Box sx={{ mt: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography variant="body2">
-                Uploading annotations... ({uploadProgress}%)
+                Uploading annotation${editingAnnotations.length === 1 ? '' : 's'}... ({uploadProgress}%)
               </Typography>
               <Button
                 variant="outlined"
@@ -898,7 +1102,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
               </Button>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              Batch {batchInfo.current} of {batchInfo.total} • {batchInfo.totalAnnotations} total annotations • DroneDeploy processing
+              Batch {batchInfo.current} of {batchInfo.total} • {batchInfo.totalAnnotations} total annotation${batchInfo.totalAnnotations === 1 ? '' : 's'} • DroneDeploy processing
             </Typography>
             <LinearProgress 
               variant="determinate" 
@@ -929,7 +1133,7 @@ const AnnotationPreview = ({ annotations = [], config = {}, onUpload, onBack }) 
             variant="contained"
             onClick={handleUpload}
             startIcon={<Upload />}
-            disabled={uploading}
+            disabled={uploading || !config.apiKey || !config.planId}
             size="large"
           >
             {uploading ? 'Uploading...' : `Upload ${editingAnnotations.length} Annotations`}

@@ -25,10 +25,11 @@ import {
   CloudDone,
   Warning,
   OpenInNew,
-  CloudUpload
+  CloudUpload,
+  Undo
 } from '@mui/icons-material';
 
-const UploadResults = ({ results, onReset, onNewUpload }) => {
+const UploadResults = ({ results, onReset, onNewUpload, onUndo }) => {
   if (!results) return null;
 
   const { 
@@ -58,21 +59,21 @@ const UploadResults = ({ results, onReset, onNewUpload }) => {
         severity: 'success',
         icon: <CloudDone />,
         title: 'Upload Completed Successfully!',
-        message: `All ${successCount} annotations were uploaded to DroneDeploy.`
+        message: `All ${successCount} annotation${successCount === 1 ? '' : 's'} were uploaded to DroneDeploy.`
       };
     } else if (successCount === 0) {
       return {
         severity: 'error',
         icon: <Error />,
         title: 'Upload Failed',
-        message: `None of the ${totalProcessed} annotations could be uploaded.`
+        message: `None of the ${totalProcessed} annotation${totalProcessed === 1 ? '' : 's'} could be uploaded.`
       };
     } else {
       return {
         severity: 'warning',
         icon: <Warning />,
         title: 'Partial Upload Success',
-        message: `${successCount} of ${totalProcessed} annotations were uploaded successfully.`
+        message: `${successCount} of ${totalProcessed} annotation${totalProcessed === 1 ? '' : 's'} were uploaded successfully.`
       };
     }
   };
@@ -151,7 +152,7 @@ const UploadResults = ({ results, onReset, onNewUpload }) => {
                   <TableBody>
                     {successResults.map((result, index) => (
                       <TableRow key={index}>
-                        <TableCell>{result.annotation}</TableCell>
+                        <TableCell>{result.title || result.annotation || 'Unnamed Annotation'}</TableCell>
                         <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                           {createDroneDeployLink(result.id) ? (
                             <Link
@@ -262,6 +263,26 @@ const UploadResults = ({ results, onReset, onNewUpload }) => {
           >
             Start Over
           </Button>
+          
+          {successCount > 0 && onUndo && (
+            <Button
+              variant="outlined"
+              onClick={onUndo}
+              startIcon={<Undo />}
+              size="large"
+              sx={{
+                borderColor: 'warning.main',
+                color: 'warning.main',
+                '&:hover': {
+                  borderColor: 'warning.dark',
+                  backgroundColor: 'rgba(255, 152, 0, 0.04)'
+                }
+              }}
+            >
+              Undo Upload
+            </Button>
+          )}
+          
           <Button
             variant="contained"
             onClick={onNewUpload}

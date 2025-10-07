@@ -4,10 +4,9 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Sample Location Point",
+        "title": "Sample Location Point",
         "color": "#2196f3",
-        "fillColor": "#64b5f6",
-        "description": "This is a sample location annotation"
+        "fillColor": "#64b5f6"
       },
       "geometry": {
         "type": "Point",
@@ -17,10 +16,9 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Building Footprint",
+        "title": "Building Footprint",
         "color": "#4caf50",
-        "fillColor": "#81c784",
-        "description": "Sample area annotation - building footprint"
+        "fillColor": "#81c784"
       },
       "geometry": {
         "type": "Polygon",
@@ -36,10 +34,9 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Access Road",
+        "title": "Access Road",
         "color": "#ff9800",
-        "fillColor": "#ffb74d",
-        "description": "Sample line annotation - access road"
+        "fillColor": "#ffb74d"
       },
       "geometry": {
         "type": "LineString",
@@ -54,10 +51,9 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Parking Lot",
+        "title": "Parking Lot",
         "color": "#9c27b0",
-        "fillColor": "#ba68c8",
-        "description": "Sample area annotation - parking lot"
+        "fillColor": "#ba68c8"
       },
       "geometry": {
         "type": "Polygon",
@@ -73,10 +69,9 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Fence Line",
+        "title": "Fence Line",
         "color": "#e91e63",
-        "fillColor": "#f48fb1",
-        "description": "Sample line annotation - fence boundary"
+        "fillColor": "#f48fb1"
       },
       "geometry": {
         "type": "LineString",
@@ -90,7 +85,7 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Entry Gate",
+        "title": "Entry Gate",
         "color": "#795548",
         "fillColor": "#a1887f"
       },

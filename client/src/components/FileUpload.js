@@ -76,7 +76,8 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
       setUploadProgress(90);
       
       if (response.data.success) {
-        setAnnotations(response.data.annotations);
+        const annotations = response.data.data || response.data.annotations || [];
+        setAnnotations(annotations);
         setShowUploadArea(false); // Collapse upload area after successful upload
         setUploadProgress(100);
         
@@ -84,14 +85,14 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
 
         // Pass both annotations and color standardization setting
         onFileUpload({
-          annotations: response.data.annotations,
+          annotations: annotations,
           forceStandardColors,
-          originalAnnotations: response.data.originalAnnotations || response.data.annotations
+          originalAnnotations: response.data.originalAnnotations || annotations
         });
         
         setUploadStatus({
           type: 'success',
-          message: `Successfully parsed ${response.data.count} annotations from ${file.name}`
+          message: `Successfully parsed ${annotations.length} annotation${annotations.length === 1 ? '' : 's'} from ${file.name}`
         });
       } else {
         setUploadStatus({
@@ -202,7 +203,7 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
       )}
 
       {/* Show compact summary if annotations are loaded but will move to step 2 */}
-      {annotations.length > 0 && !uploading && (
+      {annotations && annotations.length > 0 && !uploading && (
         <Box sx={{ mb: 3 }}>
           <Alert severity="success" sx={{ 
             borderRadius: 2,
@@ -212,7 +213,7 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
           }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="body2">
-                <strong>Ready!</strong> Found {annotations.length} annotations. 
+                <strong>Ready!</strong> Found {annotations?.length || 0} annotation{(annotations?.length || 0) === 1 ? '' : 's'}. 
                 {forceStandardColors ? ' Colors will be standardized to DroneDeploy palette.' : ' Using original colors.'}
               </Typography>
               <Button
@@ -265,7 +266,7 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
       </Box>
 
       {/* Upload area - show always when no annotations, or when explicitly requested */}
-      {(showUploadArea || annotations.length === 0) && (
+      {(showUploadArea || !annotations || annotations.length === 0) && (
         <>
         <Paper
         {...getRootProps()}
@@ -330,7 +331,7 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
         </>
       )}
 
-      {selectedFiles.length > 0 && (showUploadArea || annotations.length === 0) && (
+      {selectedFiles.length > 0 && (showUploadArea || !annotations || annotations.length === 0) && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
             Selected file:
@@ -375,10 +376,10 @@ const FileUpload = ({ onFileUpload, onNext, config }) => {
         <Button
           variant="contained"
           onClick={handleProceed}
-          disabled={annotations.length === 0}
+          disabled={!annotations || annotations.length === 0}
           startIcon={<CheckCircle />}
         >
-          Proceed with {annotations.length} annotations
+          Proceed with {annotations?.length || 0} annotation{(annotations?.length || 0) === 1 ? '' : 's'}
         </Button>
       </Box>
     </Box>

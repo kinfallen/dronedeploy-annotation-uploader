@@ -93,7 +93,7 @@ The CSV file should include these columns:
 | title | Yes | Annotation name | "Building A" |
 | lat | For LOCATION | Latitude | -38.18583043875179 |
 | lng | For LOCATION | Longitude | 145.81114563959918 |
-| color | No | Border color | #2196f3 |
+| color | Yes | Border color | #2196f3 |
 | fillColor | No | Fill color | #64b5f6 |
 | geometry | For AREA/LINE | Coordinate array as JSON string | See examples below |
 

@@ -28,18 +28,80 @@ const MapViewer = ({ annotations, height = 400 }) => {
   // Generate a unique ID for this map instance
   const mapId = useMemo(() => `map-${Date.now()}-${Math.random()}`, []);
 
-  const centerPosition = useMemo(() => {
+  // Calculate bounds and center from all annotations
+  const mapBounds = useMemo(() => {
     if (annotations.length === 0) {
-      return [-38.1858, 145.8111]; // Default center
+      return {
+        center: [-38.1858, 145.8111], // Default center
+        bounds: null
+      };
     }
     
-    // Calculate center from first annotation
-    const firstAnnotation = annotations[0];
-    if (firstAnnotation.geometry?.lat && firstAnnotation.geometry?.lng) {
-      return [firstAnnotation.geometry.lat, firstAnnotation.geometry.lng];
+    const coordinates = [];
+    
+    annotations.forEach(annotation => {
+      // Handle server-converted format (lat/lng properties for points)
+      if (annotation.lat && annotation.lng) {
+        coordinates.push([annotation.lat, annotation.lng]);
+      }
+      // Handle server-converted format (geometry array for polygons/lines)
+      else if (Array.isArray(annotation.geometry)) {
+        annotation.geometry.forEach(coord => {
+          if (Array.isArray(coord) && coord.length >= 2) {
+            const [lng, lat] = coord;
+            if (typeof lat === 'number' && typeof lng === 'number') {
+              coordinates.push([lat, lng]);
+            }
+          }
+        });
+      }
+      // Handle original GeoJSON format (fallback)
+      else if (annotation.geometry?.type === 'Point' && annotation.geometry?.coordinates) {
+        const [lng, lat] = annotation.geometry.coordinates;
+        coordinates.push([lat, lng]);
+      } else if (annotation.geometry?.type === 'Polygon' && annotation.geometry?.coordinates) {
+        const outerRing = annotation.geometry.coordinates[0];
+        outerRing.forEach(([lng, lat]) => {
+          coordinates.push([lat, lng]);
+        });
+      } else if (annotation.geometry?.type === 'LineString' && annotation.geometry?.coordinates) {
+        annotation.geometry.coordinates.forEach(([lng, lat]) => {
+          coordinates.push([lat, lng]);
+        });
+      }
+    });
+    
+    if (coordinates.length === 0) {
+      return {
+        center: [-38.1858, 145.8111],
+        bounds: null
+      };
     }
     
-    return [-38.1858, 145.8111];
+    // Calculate bounds
+    const lats = coordinates.map(coord => coord[0]);
+    const lngs = coordinates.map(coord => coord[1]);
+    
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    
+    // Calculate center
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    
+    console.log('MapViewer bounds calculation:', {
+      coordinates: coordinates.slice(0, 3), // Log first 3 for debugging
+      totalCoords: coordinates.length,
+      bounds: [[minLat, minLng], [maxLat, maxLng]],
+      center: [centerLat, centerLng]
+    });
+    
+    return {
+      center: [centerLat, centerLng],
+      bounds: [[minLat, minLng], [maxLat, maxLng]]
+    };
   }, [annotations]);
 
   // Clear existing markers
@@ -60,12 +122,31 @@ const MapViewer = ({ annotations, height = 400 }) => {
     const bounds = [];
 
     annotations.forEach((annotation, index) => {
-      if (!annotation.geometry) return;
+      const { type, annotationType, title, color, fillColor } = annotation;
+      const finalType = type || annotationType; // Handle both server and original formats
 
-      const { annotationType, title, color, fillColor } = annotation;
+      // Handle server-converted format for LOCATION (Points) - lat/lng directly on annotation
+      if ((finalType === 'LOCATION' || finalType === 'POINT') && annotation.lat && annotation.lng) {
+        // Point marker - server format has lat/lng directly on annotation
+        const marker = L.marker([annotation.lat, annotation.lng], {
+          icon: createColoredIcon(color)
+        }).addTo(map);
 
-      if (annotationType === 'LOCATION' && annotation.geometry.lat && annotation.geometry.lng) {
-        // Point marker
+        marker.bindPopup(`
+          <div>
+            <strong>${title}</strong><br/>
+            <span style="font-size: 12px; color: #666;">${finalType}</span><br/>
+            <span style="font-size: 11px;">${annotation.lat.toFixed(6)}, ${annotation.lng.toFixed(6)}</span>
+          </div>
+        `);
+
+        markersRef.current.push(marker);
+        bounds.push([annotation.lat, annotation.lng]);
+
+      } 
+      // Handle original format for LOCATION (Points) - nested under geometry
+      else if ((finalType === 'LOCATION' || finalType === 'POINT') && annotation.geometry?.lat && annotation.geometry?.lng) {
+        // Point marker - original format has lat/lng under geometry
         const marker = L.marker([annotation.geometry.lat, annotation.geometry.lng], {
           icon: createColoredIcon(color)
         }).addTo(map);
@@ -73,7 +154,7 @@ const MapViewer = ({ annotations, height = 400 }) => {
         marker.bindPopup(`
           <div>
             <strong>${title}</strong><br/>
-            <span style="font-size: 12px; color: #666;">${annotationType}</span><br/>
+            <span style="font-size: 12px; color: #666;">${finalType}</span><br/>
             <span style="font-size: 11px;">${annotation.geometry.lat.toFixed(6)}, ${annotation.geometry.lng.toFixed(6)}</span>
           </div>
         `);
@@ -81,7 +162,9 @@ const MapViewer = ({ annotations, height = 400 }) => {
         markersRef.current.push(marker);
         bounds.push([annotation.geometry.lat, annotation.geometry.lng]);
 
-      } else if (annotationType === 'AREA' && Array.isArray(annotation.geometry)) {
+      } 
+      // Handle server-converted format for AREA (Polygons) - geometry array
+      else if ((finalType === 'AREA' || finalType === 'POLYGON') && Array.isArray(annotation.geometry)) {
         // Polygon - handle both flat array and nested array formats
         let coordinates;
         
@@ -161,6 +244,34 @@ const MapViewer = ({ annotations, height = 400 }) => {
           console.warn('LINE annotation needs at least 2 valid coordinate pairs, got:', positions.length);
         }
       }
+      // Handle original GeoJSON format (fallback)
+      else if (annotation.geometry?.type === 'Point' && annotation.geometry?.coordinates) {
+        const [lng, lat] = annotation.geometry.coordinates;
+        const marker = L.marker([lat, lng], {
+          icon: createColoredIcon(color)
+        }).addTo(map);
+
+        marker.bindPopup(`
+          <div>
+            <strong>${title}</strong><br/>
+            <span style="font-size: 12px; color: #666;">Point</span><br/>
+            <span style="font-size: 11px;">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
+          </div>
+        `);
+
+        markersRef.current.push(marker);
+        bounds.push([lat, lng]);
+      }
+      else {
+        console.warn('Unsupported annotation format:', {
+          type: finalType,
+          hasLat: !!annotation.lat,
+          hasLng: !!annotation.lng,
+          hasGeometry: !!annotation.geometry,
+          geometryType: annotation.geometry?.type,
+          annotation
+        });
+      }
     });
 
     // Fit bounds if we have annotations
@@ -171,6 +282,12 @@ const MapViewer = ({ annotations, height = 400 }) => {
         console.log('Map bounds fitting error:', error);
       }
     }
+    
+    console.log('MapViewer addAnnotationsToMap:', {
+      totalAnnotations: annotations.length,
+      boundsCount: bounds.length,
+      markersAdded: markersRef.current.length
+    });
   };
 
   // Initialize map
@@ -186,8 +303,8 @@ const MapViewer = ({ annotations, height = 400 }) => {
 
     // Create new map
     const map = L.map(containerRef.current, {
-      center: centerPosition,
-      zoom: 15,
+      center: mapBounds.center,
+      zoom: 15, // Default zoom, will be adjusted with fitBounds if we have bounds
       scrollWheelZoom: true
     });
 
@@ -202,6 +319,15 @@ const MapViewer = ({ annotations, height = 400 }) => {
     // Add annotations
     addAnnotationsToMap(map);
 
+    // Fit bounds to show all annotations with padding
+    if (mapBounds.bounds) {
+      // Add some padding around the bounds
+      map.fitBounds(mapBounds.bounds, {
+        padding: [20, 20], // 20px padding on all sides
+        maxZoom: 16 // Don't zoom in too much for single points
+      });
+    }
+
     // Cleanup function
     return () => {
       if (mapRef.current) {
@@ -211,7 +337,7 @@ const MapViewer = ({ annotations, height = 400 }) => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annotations, centerPosition]);
+  }, [annotations, mapBounds]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -228,7 +354,7 @@ const MapViewer = ({ annotations, height = 400 }) => {
     return (
       <Paper sx={{ p: 3, textAlign: 'center', mb: 2 }}>
         <Typography variant="body2" color="text.secondary">
-          Upload a file to see annotations on the map
+          Upload a file to see annotation${annotations.length === 1 ? '' : 's'} on the map
         </Typography>
       </Paper>
     );
@@ -238,7 +364,7 @@ const MapViewer = ({ annotations, height = 400 }) => {
     <Paper sx={{ mb: 2 }}>
       <Box sx={{ p: 2 }}>
         <Typography variant="subtitle1" gutterBottom>
-          Map Preview ({annotations.length} annotations)
+          Map Preview ({annotations.length} annotation{annotations.length === 1 ? '' : 's'})
         </Typography>
         <Box sx={{ height, borderRadius: 1, overflow: 'hidden' }}>
           <div

@@ -60,11 +60,22 @@ function parseCSV(filePath) {
  * @returns {Object|null} Annotation object or null if invalid
  */
 function convertCSVRowToAnnotation(row) {
+  // Required fields validation
+  if (!row.annotationType && !row.type) {
+    throw new Error('Missing required field: annotationType');
+  }
+  if (!row.title) {
+    throw new Error('Missing required field: title');
+  }
+  if (!row.color) {
+    throw new Error('Missing required field: color');
+  }
+
   const annotation = {
-    annotationType: row.annotationType?.toUpperCase(),
-    title: row.title || row.name || 'Untitled',
-    color: row.color || '#FF0000',
-    fillColor: row.fillColor || row.color || '#FF0000'
+    annotationType: (row.annotationType || row.type)?.toUpperCase(),
+    title: row.title,
+    color: row.color,
+    fillColor: row.fillColor || row.color // Use color as fallback for fillColor
   };
   
   // Validate annotation type
@@ -74,6 +85,11 @@ function convertCSVRowToAnnotation(row) {
   
   // Parse geometry based on annotation type
   if (annotation.annotationType === 'LOCATION') {
+    // For LOCATION, lat and lng are required
+    if (!row.lat || !row.lng) {
+      throw new Error('LOCATION annotations require lat and lng fields');
+    }
+    
     const lat = parseFloat(row.lat);
     const lng = parseFloat(row.lng);
     
@@ -81,31 +97,66 @@ function convertCSVRowToAnnotation(row) {
       throw new Error('Invalid coordinates for LOCATION annotation');
     }
     
-    annotation.geometry = { lat, lng };
-  } else {
-    // For AREA and LINE, collect coordinate pairs
-    const coordinates = [];
-    let i = 1;
+    // Create GeoJSON Point geometry format
+    annotation.geometry = {
+      type: 'Point',
+      coordinates: [lng, lat] // GeoJSON format [lng, lat]
+    };
+  } else if (annotation.annotationType === 'AREA' || annotation.annotationType === 'LINE') {
+    // For AREA and LINE, geometry field is required
+    if (!row.geometry) {
+      throw new Error(`${annotation.annotationType} annotations require geometry field`);
+    }
     
-    while (row[`lat${i > 1 ? i : ''}`] && row[`lng${i > 1 ? i : ''}`]) {
-      const lat = parseFloat(row[`lat${i > 1 ? i : ''}`]);
-      const lng = parseFloat(row[`lng${i > 1 ? i : ''}`]);
+    try {
+      // Parse geometry string - should be array of [lng,lat] coordinates
+      const geometryData = JSON.parse(row.geometry);
       
-      if (!isNaN(lat) && !isNaN(lng)) {
-        coordinates.push([lng, lat]); // GeoJSON format [lng, lat]
+      if (!Array.isArray(geometryData)) {
+        throw new Error('Geometry must be an array of coordinates');
       }
-      i++;
+      
+      // Validate minimum points
+      const minPoints = ANNOTATION_TYPES[annotation.annotationType].minPoints;
+      if (geometryData.length < minPoints) {
+        throw new Error(ERROR_MESSAGES.VALIDATION.INSUFFICIENT_POINTS(
+          annotation.annotationType,
+          geometryData.length,
+          minPoints
+        ));
+      }
+      
+      // Validate coordinate format
+      for (const coord of geometryData) {
+        if (!Array.isArray(coord) || coord.length < 2 || 
+            isNaN(parseFloat(coord[0])) || isNaN(parseFloat(coord[1]))) {
+          throw new Error('Invalid coordinate format. Expected [lng,lat] pairs');
+        }
+      }
+      
+      if (annotation.annotationType === 'AREA') {
+        // For polygons, ensure it's closed (first and last points are the same)
+        const firstPoint = geometryData[0];
+        const lastPoint = geometryData[geometryData.length - 1];
+        
+        if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
+          // Auto-close the polygon
+          geometryData.push([firstPoint[0], firstPoint[1]]);
+        }
+        
+        annotation.geometry = {
+          type: 'Polygon',
+          coordinates: [geometryData] // Wrap in array for polygon outer ring
+        };
+      } else if (annotation.annotationType === 'LINE') {
+        annotation.geometry = {
+          type: 'LineString',
+          coordinates: geometryData
+        };
+      }
+    } catch (error) {
+      throw new Error(`Invalid geometry format: ${error.message}`);
     }
-    
-    if (coordinates.length < ANNOTATION_TYPES[annotation.annotationType].minPoints) {
-      throw new Error(ERROR_MESSAGES.VALIDATION.INSUFFICIENT_POINTS(
-        annotation.annotationType,
-        coordinates.length,
-        ANNOTATION_TYPES[annotation.annotationType].minPoints
-      ));
-    }
-    
-    annotation.geometry = coordinates;
   }
   
   return annotation;
@@ -165,30 +216,35 @@ function convertGeoJSONFeatureToAnnotation(feature) {
     throw new Error('Invalid GeoJSON feature: missing geometry');
   }
   
+  // Required fields validation
+  if (!feature.properties?.title) {
+    throw new Error('Missing required field: title in properties');
+  }
+  if (!feature.properties?.color) {
+    throw new Error('Missing required field: color in properties');
+  }
+  
   const annotation = {
-    title: feature.properties?.title || feature.properties?.name || 'Untitled',
-    color: feature.properties?.color || '#FF0000',
-    fillColor: feature.properties?.fillColor || feature.properties?.color || '#FF0000'
+    title: feature.properties.title,
+    color: feature.properties.color,
+    fillColor: feature.properties.fillColor || feature.properties.color // Use color as fallback
   };
   
-  // Map GeoJSON geometry types to annotation types
+  // Map GeoJSON geometry types to annotation types and preserve geometry
   switch (feature.geometry.type) {
     case 'Point':
       annotation.annotationType = 'LOCATION';
-      annotation.geometry = {
-        lat: feature.geometry.coordinates[1],
-        lng: feature.geometry.coordinates[0]
-      };
+      annotation.geometry = feature.geometry; // Keep full GeoJSON geometry
       break;
       
     case 'Polygon':
       annotation.annotationType = 'AREA';
-      annotation.geometry = feature.geometry.coordinates[0]; // Outer ring
+      annotation.geometry = feature.geometry; // Keep full GeoJSON geometry
       break;
       
     case 'LineString':
       annotation.annotationType = 'LINE';
-      annotation.geometry = feature.geometry.coordinates;
+      annotation.geometry = feature.geometry; // Keep full GeoJSON geometry
       break;
       
     default:
@@ -249,33 +305,71 @@ async function parseKML(filePath) {
  * @returns {Object|null} Annotation object or null if invalid
  */
 function convertKMLPlacemarkToAnnotation(placemark) {
+  // Required field validation
   if (!placemark.name) {
-    throw new Error('KML placemark missing name');
+    throw new Error('KML placemark missing required field: name');
   }
   
   const annotation = {
     title: placemark.name,
     color: '#FF0000', // Default color, KML color parsing is complex
-    fillColor: '#FF0000'
+    fillColor: '#FF0000' // Default fillColor
   };
   
   // Parse different geometry types
   if (placemark.Point) {
     annotation.annotationType = 'LOCATION';
     const coords = placemark.Point.coordinates.split(',');
+    if (coords.length < 2) {
+      throw new Error('Invalid Point coordinates in KML');
+    }
     annotation.geometry = {
-      lat: parseFloat(coords[1]),
-      lng: parseFloat(coords[0])
+      type: 'Point',
+      coordinates: [parseFloat(coords[0]), parseFloat(coords[1])] // [lng, lat]
     };
   } else if (placemark.Polygon) {
     annotation.annotationType = 'AREA';
+    if (!placemark.Polygon.outerBoundaryIs?.LinearRing?.coordinates) {
+      throw new Error('Invalid Polygon structure in KML');
+    }
     const coordString = placemark.Polygon.outerBoundaryIs.LinearRing.coordinates;
-    annotation.geometry = parseKMLCoordinates(coordString);
+    const coordinates = parseKMLCoordinates(coordString);
+    
+    // Validate minimum points for area
+    if (coordinates.length < ANNOTATION_TYPES.AREA.minPoints) {
+      throw new Error(ERROR_MESSAGES.VALIDATION.INSUFFICIENT_POINTS(
+        'AREA',
+        coordinates.length,
+        ANNOTATION_TYPES.AREA.minPoints
+      ));
+    }
+    
+    annotation.geometry = {
+      type: 'Polygon',
+      coordinates: [coordinates]
+    };
   } else if (placemark.LineString) {
     annotation.annotationType = 'LINE';
-    annotation.geometry = parseKMLCoordinates(placemark.LineString.coordinates);
+    if (!placemark.LineString.coordinates) {
+      throw new Error('Invalid LineString structure in KML');
+    }
+    const coordinates = parseKMLCoordinates(placemark.LineString.coordinates);
+    
+    // Validate minimum points for line
+    if (coordinates.length < ANNOTATION_TYPES.LINE.minPoints) {
+      throw new Error(ERROR_MESSAGES.VALIDATION.INSUFFICIENT_POINTS(
+        'LINE',
+        coordinates.length,
+        ANNOTATION_TYPES.LINE.minPoints
+      ));
+    }
+    
+    annotation.geometry = {
+      type: 'LineString',
+      coordinates: coordinates
+    };
   } else {
-    throw new Error('Unsupported KML geometry type');
+    throw new Error('Unsupported KML geometry type or missing geometry');
   }
   
   return annotation;

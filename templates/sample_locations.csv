@@ -1,4 +1,4 @@
-type,title,lat,lng,color,fillColor,geometry
+annotationType,title,lat,lng,color,fillColor,geometry
 LOCATION,Equipment Storage,-38.18583043875179,145.81114563959918,#6639b6,#8c6bc8,
 LOCATION,Control Point 1,-38.18573135812284,145.81116941923875,#9b26af,#b45cc3,
 LOCATION,Control Point 2,-38.18573042056457,145.81096844675832,#009587,#40b0a5,

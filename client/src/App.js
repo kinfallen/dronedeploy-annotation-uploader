@@ -25,6 +25,7 @@ import FileUpload from './components/FileUpload';
 import AnnotationPreview from './components/AnnotationPreview';
 import ConfigurationForm from './components/ConfigurationForm';
 import UploadResults from './components/UploadResults';
+import UndoUpload from './components/UndoUpload';
 
 // Dark mode theme with Urbanist and Hanken Grotesk
 const theme = createTheme({
@@ -187,6 +188,24 @@ const theme = createTheme({
     '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
     '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
     '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    '0 25px 50px -12px rgb(0 0 0 / 0.25)'
   ],
   components: {
     MuiCssBaseline: {
@@ -427,6 +446,13 @@ function App() {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
 
+  const handleStepClick = (stepIndex) => {
+    // Only allow clicking on previous steps (not future steps)
+    if (stepIndex < activeStep) {
+      setActiveStep(stepIndex);
+    }
+  };
+
   const handleReset = () => {
     setActiveStep(0);
     setAnnotations([]);
@@ -497,6 +523,26 @@ function App() {
     );
   }
 
+  // Show Undo Upload page
+  if (currentPage === 'undo') {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ 
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%)',
+        }}>
+          <Container maxWidth="lg">
+            <UndoUpload 
+              onBack={() => setCurrentPage('uploader')} 
+              config={config}
+            />
+          </Container>
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   // Show main uploader page  
   return (
     <ThemeProvider theme={theme}>
@@ -542,7 +588,7 @@ function App() {
           </Box>
           
           {/* Format Guide Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
             <Button
               variant="outlined"
               onClick={() => setCurrentPage('guide')}
@@ -554,6 +600,25 @@ function App() {
               }}
             >
               📚 Format Guide & Examples
+            </Button>
+            
+            <Button
+              variant="outlined"
+              onClick={() => setCurrentPage('undo')}
+              sx={{ 
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 3,
+                borderColor: 'warning.main',
+                color: 'warning.main',
+                '&:hover': {
+                  borderColor: 'warning.dark',
+                  backgroundColor: 'rgba(255, 152, 0, 0.04)'
+                }
+              }}
+            >
+              ↶ Undo Uploads
             </Button>
           </Box>
         </Box>
@@ -654,7 +719,23 @@ function App() {
         }}>
           <Stepper activeStep={activeStep} orientation="vertical">
             <Step>
-              <StepLabel>Upload File</StepLabel>
+              <StepLabel 
+                onClick={() => handleStepClick(0)}
+                sx={{ 
+                  cursor: activeStep > 0 ? 'pointer' : 'default',
+                  '&:hover': activeStep > 0 ? { 
+                    backgroundColor: 'rgba(63, 72, 233, 0.08)',
+                    borderRadius: 1,
+                    transition: 'background-color 0.2s ease'
+                  } : {},
+                  '& .MuiStepLabel-label': {
+                    color: activeStep > 0 ? 'primary.main' : 'inherit',
+                    fontWeight: activeStep > 0 ? 500 : 'inherit'
+                  }
+                }}
+              >
+                Upload File
+              </StepLabel>
               <StepContent>
                 <FileUpload 
                   onFileUpload={handleFileUpload}
@@ -665,7 +746,23 @@ function App() {
             </Step>
 
             <Step>
-              <StepLabel>Preview Annotations</StepLabel>
+              <StepLabel 
+                onClick={() => handleStepClick(1)}
+                sx={{ 
+                  cursor: activeStep > 1 ? 'pointer' : 'default',
+                  '&:hover': activeStep > 1 ? { 
+                    backgroundColor: 'rgba(63, 72, 233, 0.08)',
+                    borderRadius: 1,
+                    transition: 'background-color 0.2s ease'
+                  } : {},
+                  '& .MuiStepLabel-label': {
+                    color: activeStep > 1 ? 'primary.main' : 'inherit',
+                    fontWeight: activeStep > 1 ? 500 : 'inherit'
+                  }
+                }}
+              >
+                Preview Annotations
+              </StepLabel>
               <StepContent>
                 <AnnotationPreview
                   annotations={annotations}
@@ -677,12 +774,29 @@ function App() {
             </Step>
 
             <Step>
-              <StepLabel>Upload Results</StepLabel>
+              <StepLabel 
+                onClick={() => handleStepClick(2)}
+                sx={{ 
+                  cursor: activeStep > 2 ? 'pointer' : 'default',
+                  '&:hover': activeStep > 2 ? { 
+                    backgroundColor: 'rgba(63, 72, 233, 0.08)',
+                    borderRadius: 1,
+                    transition: 'background-color 0.2s ease'
+                  } : {},
+                  '& .MuiStepLabel-label': {
+                    color: activeStep > 2 ? 'primary.main' : 'inherit',
+                    fontWeight: activeStep > 2 ? 500 : 'inherit'
+                  }
+                }}
+              >
+                Upload Results
+              </StepLabel>
               <StepContent>
                 <UploadResults
                   results={uploadResults}
                   onReset={handleReset}
                   onNewUpload={startNewUpload}
+                  onUndo={() => setCurrentPage('undo')}
                 />
               </StepContent>
             </Step>

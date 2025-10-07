@@ -38,17 +38,26 @@ const FILE_FORMATS = {
   CSV: {
     extensions: ['.csv'],
     mimeTypes: ['text/csv'],
-    requiredFields: ['annotationType', 'title', 'lat', 'lng'],
-    optionalFields: ['color', 'fillColor', 'description']
+    requiredFields: ['annotationType', 'title', 'color'],
+    conditionalFields: {
+      LOCATION: ['lat', 'lng'],
+      AREA: ['geometry'],
+      LINE: ['geometry']
+    },
+    optionalFields: ['fillColor']
   },
   GEOJSON: {
     extensions: ['.json', '.geojson'],
     mimeTypes: ['application/json'],
-    requiredStructure: ['type', 'features']
+    requiredStructure: ['type', 'features'],
+    requiredFields: ['properties.title', 'properties.color'],
+    optionalFields: ['properties.fillColor']
   },
   KML: {
     extensions: ['.kml'],
-    mimeTypes: ['application/vnd.google-earth.kml+xml', 'text/xml']
+    mimeTypes: ['application/vnd.google-earth.kml+xml', 'text/xml'],
+    requiredFields: ['name', 'geometry'],
+    optionalFields: ['description', 'style']
   },
   KMZ: {
     extensions: ['.kmz'],

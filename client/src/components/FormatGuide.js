@@ -28,9 +28,8 @@ import {
 const FormatGuide = ({ onBack }) => {
   const csvExample = `annotationType,title,lat,lng,color,fillColor
 LOCATION,"Main Entrance",37.7749,-122.4194,#FF0000,#FF0000
-AREA,"Building Outline",37.7750,-122.4195,#00FF00,#00FF00
-AREA,"Parking Lot",37.7748,-122.4193,#0000FF,#0000FF
-LINE,"Property Line",37.7751,-122.4196,#FFFF00,#FFFF00`;
+AREA,"Building Outline",,,#00FF00,#00FF00,"[[-122.4195,37.7750],[-122.4190,37.7750],[-122.4190,37.7745],[-122.4195,37.7745],[-122.4195,37.7750]]"
+LINE,"Property Line",,,#FFFF00,#FFFF00,"[[-122.4196,37.7751],[-122.4191,37.7751],[-122.4191,37.7746]]"`;
 
   const geoJsonExample = `{
   "type": "FeatureCollection",
@@ -113,14 +112,19 @@ LINE,"Property Line",37.7751,-122.4196,#FFFF00,#FFFF00`;
       icon: <Description color="secondary" />,
       description: 'Comma-separated values with headers',
       annotationTypes: ['LOCATION', 'AREA', 'LINE'],
-      requiredFields: ['annotationType', 'title', 'lat', 'lng'],
-      optionalFields: ['color', 'fillColor', 'description'],
+      requiredFields: ['annotationType', 'title', 'color'],
+      conditionalFields: {
+        'LOCATION': ['lat', 'lng'],
+        'AREA/LINE': ['geometry']
+      },
+      optionalFields: ['fillColor'],
       notes: [
         'First row must contain column headers',
         'AREA requires minimum 3 coordinate pairs (lat,lng)',
         'LINE requires minimum 2 coordinate pairs',
-        'For multi-point annotations, use additional lat/lng columns (lat2,lng2,lat3,lng3...)',
-        'Colors can be hex (#FF0000) or named (red)',
+        'For LOCATION: use lat,lng columns',
+        'For AREA/LINE: use geometry column with [[lng,lat],[lng,lat],...] format',
+        'Colors must be hex (#FF0000) or named (red)',
         'If no fillColor provided, color value is used for fill'
       ],
       example: csvExample
@@ -130,15 +134,15 @@ LINE,"Property Line",37.7751,-122.4196,#FFFF00,#FFFF00`;
       icon: <LocationOn color="primary" />,
       description: 'Geographic JSON format following RFC 7946',
       annotationTypes: ['Point → LOCATION', 'Polygon → AREA', 'LineString → LINE'],
-      requiredFields: ['type: "FeatureCollection"', 'features array'],
-      optionalFields: ['properties.color', 'properties.fillColor', 'properties.description'],
+      requiredFields: ['type: "FeatureCollection"', 'features array', 'properties.title', 'properties.color'],
+      optionalFields: ['properties.fillColor'],
       notes: [
         'Must be valid GeoJSON FeatureCollection',
         'Point coordinates: [longitude, latitude]',
         'Polygon must be closed (first and last coordinates identical)',
         'LineString minimum 2 coordinates',
         'Properties object contains annotation metadata',
-        'Color properties should be hex values'
+        'Color properties are required and should be hex values'
       ],
       example: geoJsonExample
     },
@@ -147,7 +151,7 @@ LINE,"Property Line",37.7751,-122.4196,#FFFF00,#FFFF00`;
       icon: <Crop color="success" />,
       description: 'Google Earth format (KMZ is compressed KML)',
       annotationTypes: ['Point → LOCATION', 'Polygon → AREA', 'LineString → LINE'],
-      requiredFields: ['<Placemark>', '<name>', 'geometry element'],
+      requiredFields: ['<Placemark>', '<name>', 'geometry element (Point/Polygon/LineString)'],
       optionalFields: ['<Style>', '<description>', '<ExtendedData>'],
       notes: [
         'Valid XML structure required',
@@ -247,7 +251,7 @@ LINE,"Property Line",37.7751,-122.4196,#FFFF00,#FFFF00`;
               </Box>
 
               {/* Fields */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'error.main' }}>
                     Required Fields:
@@ -260,6 +264,22 @@ LINE,"Property Line",37.7751,-122.4196,#FFFF00,#FFFF00`;
                     ))}
                   </Box>
                 </Box>
+
+                {/* Conditional Fields for CSV */}
+                {spec.conditionalFields && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'warning.main' }}>
+                      Conditional Fields (by annotation type):
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      {Object.entries(spec.conditionalFields).map(([type, fields]) => (
+                        <Typography key={type} variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          • {type}: {Array.isArray(fields) ? fields.join(', ') : fields}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
                 
                 <Box>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'success.main' }}>
